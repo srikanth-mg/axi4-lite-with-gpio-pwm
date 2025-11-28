@@ -21,10 +21,10 @@ The peripheral internally contains three sub-blocks:
 Mapped registers:
 
 Offset	Name	Width	Description
-`0x00`	GPIO_OUT	32-bit	Drives 8-bit GPIO output
-`0x04`	GPIO_IN	32-bit	Returns sampled external GPIO inputs
-`0x08`  PWM_CTRL	32-bit	PWM duty cycle
-`0x0C`	PWM_PERIOD	32-bit	PWM period
+- `0x00`	GPIO_OUT	32-bit	Drives 8-bit GPIO output
+- `0x04`	GPIO_IN	32-bit	Returns sampled external GPIO inputs
+- `0x08`  PWM_CTRL	32-bit	PWM duty cycle
+- `0x0C`	PWM_PERIOD	32-bit	PWM period
 
 Handles:
 
@@ -47,14 +47,14 @@ counter = (counter == period-1) ? 0 : counter + 1
 
 ## Files Structure
 
-`axi_gpio_pwm_top.sv`    - Top-level module integrating AXI, register file, GPIO, and PWM
-`axi_slave_if.sv`         - AXI4-Lite slave interface handling AW/W/B and AR/R channels
-`regfile.sv`              - Memory-mapped register file (GPIO_OUT, GPIO_IN, PWM_CTRL, PWM_PERIOD)
-`gpio.sv`                 - GPIO module that drives output pins and samples input pins
-`pwm.sv`                  - Counter-based PWM generator with runtime duty/period control
-`defines.sv`             - Global constants and register offsets used across modules
-`tb_axi_gpio_pwm_top.sv`  - Testbench verifying AXI read/write + GPIO + PWM behavior
-`wave_axi_write_read.png` - Waveform of AXI write/read + GPIO update + PWM waveform 
+- `axi_gpio_pwm_top.sv`    - Top-level module integrating AXI, register file, GPIO, and PWM
+- `axi_slave_if.sv`         - AXI4-Lite slave interface handling AW/W/B and AR/R channels
+- `regfile.sv`              - Memory-mapped register file (GPIO_OUT, GPIO_IN, PWM_CTRL, PWM_PERIOD)
+- `gpio.sv`                 - GPIO module that drives output pins and samples input pins
+- `pwm.sv`                  - Counter-based PWM generator with runtime duty/period control
+- `defines.sv`             - Global constants and register offsets used across modules
+- `tb_axi_gpio_pwm_top.sv`  - Testbench verifying AXI read/write + GPIO + PWM behavior
+- `wave_axi_write_read.png` - Waveform of AXI write/read + GPIO update + PWM waveform 
 
 
 
