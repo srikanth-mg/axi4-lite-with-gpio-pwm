@@ -42,7 +42,7 @@ Handles:
 4. PWM Generator
 
 Implements a simple counter-based PWM:
-pwm_out = (counter < duty) ? 1 : 0
+- pwm_out = (counter < duty) ? 1 : 0
 counter = (counter == period-1) ? 0 : counter + 1
 
 ## Files Structure
