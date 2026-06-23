@@ -106,7 +106,7 @@ All 10 sequences passed in Vivado behavioral simulation.
 
 ## Tools
 
-- **Simulation:** Vivado 2023.x behavioral simulation
+- **Simulation:** Vivado 2023 version for behavioral simulation
 - **Synthesis:** Vivado synthesis — clean, no critical warnings
 - **Language:** SystemVerilog (IEEE 1800-2017)
 
