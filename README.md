@@ -1,105 +1,117 @@
-## AXI4-Lite GPIO + PWM Peripheral (SystemVerilog)
+# AXI4-Lite GPIO + PWM Peripheral
 
-This repository contains a fully working AXI4-Lite–based peripheral implemented in SystemVerilog.
-It exposes GPIO output, GPIO input sampling, and a configurable PWM generator through a clean AXI4-Lite register interface.
+A fully synthesizable AXI4-Lite peripheral implemented in SystemVerilog, exposing GPIO output control, GPIO input sampling, and a runtime-configurable PWM generator through a memory-mapped register interface.
 
-The design was simulated and verified in Vivado using a dedicated testbench that exercises all AXI read/write paths and validates register-level GPIO + PWM behavior.
+Designed and verified as part of an ASIC/Digital Design portfolio project. Simulated in Vivado behavioral simulation and synthesized through Vivado synthesis (no timing constraints applied; synthesis-clean with no errors or critical warnings).
 
-## 🔧 Architecture Overview:
+---
 
-The peripheral internally contains three sub-blocks:
+## Architecture
 
-1. AXI4-Lite Slave Interface:
-- Implements write address (AW), write data (W), and write response (B) channels
-- Implements read address (AR) and read data (R) channels
-- Handles VALID/READY handshaking
-- Supports byte-level writes through WSTRB
-- Generates write_en and read_en strobes for the register file
+The design is split into four sub-blocks instantiated under a single top-level module.
 
-2. Register File
+**AXI4-Lite Slave Interface (`axi4_slave.sv`)**
 
-Mapped registers:
+Implements the full AXI4-Lite write and read paths:
 
-Offset	Name	Width	Description
-- `0x00`	GPIO_OUT	32-bit	Drives 8-bit GPIO output
-- `0x04`	GPIO_IN	32-bit	Returns sampled external GPIO inputs
-- `0x08`  PWM_CTRL	32-bit	PWM duty cycle
-- `0x0C`	PWM_PERIOD	32-bit	PWM period
+- Write address (AW), write data (W), and write response (B) channels
+- Read address (AR) and read data (R) channels
+- AW and W channels can arrive in any order — whichever arrives first is latched until the other is ready, then both are consumed together
+- B-channel back-pressure: `AWREADY`/`WREADY` are deasserted while a `BVALID` response is pending
+- `WSTRB` byte-lane masking passed through to the register file
+- `SLVERR` response on unmapped write addresses and read-only register writes
+- `SLVERR` response on unmapped read addresses; `RDATA` returns `0xDEADBEEF` as a debug sentinel
 
-Handles:
+**Register File (`regfile.sv`)**
 
-- AXI writes to update registers
-- AXI reads to return register values
-- Reset initialization
-- Default output behavior
+Four 32-bit memory-mapped registers:
 
-3. GPIO Module
+| Offset | Name         | Access | Reset      | Description                        |
+|--------|--------------|--------|------------|------------------------------------|
+| `0x0`  | `GPIO_OUT`   | R/W    | `0x0`      | Drives 8-bit GPIO output pins      |
+| `0x4`  | `GPIO_IN`    | R only | —          | Returns synchronized GPIO input    |
+| `0x8`  | `PWM_CTRL`   | R/W    | `0x0`      | PWM duty cycle (in clock cycles)   |
+| `0xC`  | `PWM_PERIOD` | R/W    | `0x0`      | PWM period (in clock cycles)       |
 
-- gpio_out: driven by GPIO_OUT register
-- gpio_in: sampled into GPIO_IN register
-- Used to emulate external hardware inputs/outputs in simulation
+Write strobes are applied per-byte lane. `GPIO_IN` is read-only; a write to `0x4` returns `SLVERR`. Unmapped addresses return `0xDEADBEEF` on read and `SLVERR` on write.
 
-4. PWM Generator
+**GPIO Module (`gpio.sv`)**
 
-Implements a simple counter-based PWM:
-- pwm_out = (counter < duty) ? 1 : 0
-- counter = (counter == period-1) ? 0 : counter + 1
+Drives `gpio_out[7:0]` directly from the `GPIO_OUT` register. Samples `gpio_in[7:0]` through a two-flop synchronizer before presenting it to the register file, preventing metastability on asynchronous external inputs.
 
-## Files Structure
+**PWM Generator (`pwm.sv`)**
 
-- `axi_gpio_pwm_top.sv`    - Top-level module integrating AXI, register file, GPIO, and PWM
-- `axi_slave_if.sv`         - AXI4-Lite slave interface handling AW/W/B and AR/R channels
-- `regfile.sv`              - Memory-mapped register file (GPIO_OUT, GPIO_IN, PWM_CTRL, PWM_PERIOD)
-- `gpio.sv`                 - GPIO module that drives output pins and samples input pins
-- `pwm.sv`                  - Counter-based PWM generator with runtime duty/period control
-- `defines.sv`             - Global constants and register offsets used across modules
-- `tb_axi_gpio_pwm_top.sv`  - Testbench verifying AXI read/write + GPIO + PWM behavior
-- `wave_axi_write_read.png` - Waveform of AXI write/read + GPIO update + PWM waveform 
+Counter-based PWM. Output is high while the free-running counter is less than the duty value, low otherwise. Counter wraps at the period value. Both duty and period are runtime-programmable through the register file.
 
+```
+pwm_out = (counter < duty) ? 1 : 0
+counter = (counter == period - 1) ? 0 : counter + 1
+```
 
+---
 
-## ✔️ Features Implemented
+## File Structure
 
-- AXI4-Lite compliant slave interface
-- Valid/Ready handshake for all read/write paths
-- Full register decode & register file
-- GPIO output control
-- GPIO input sampling
-- Runtime-programmable PWM
-- Clean, synthesizable SystemVerilog
-- Behavioral simulation verified in Vivado
-- End-to-end AXI → Regfile → GPIO/PWM path verified
+| File                    | Description                                              |
+|-------------------------|----------------------------------------------------------|
+| `top_axi_gpio_pwm.sv`   | Top-level: integrates AXI slave, regfile, GPIO, PWM     |
+| `axi4_slave.sv`         | AXI4-Lite slave — AW/W/B and AR/R channel handling      |
+| `regfile.sv`            | Memory-mapped register file with byte-lane write strobes |
+| `gpio.sv`               | GPIO output driver and two-flop input synchronizer      |
+| `pwm.sv`                | Counter-based PWM generator                             |
+| `defines.sv`            | Register offsets, reset values, response codes          |
+| `tb_axi_gpio_pwm.sv`    | Directed self-checking testbench (10 test sequences)    |
 
-## 🧪 Simulation Summary
+---
 
-The design is verified using a dedicated SystemVerilog testbench.
+## Testbench
 
-Key test sequences:
-Write `GPIO_OUT` = 0xAA → verify gpio_out updates
-Read back `GPIO_OUT` → confirm AXI read mux
-Set `PWM_CTRL` = 100, PWM_PERIOD = 200 → verify PWM output waveform
-Read `GPIO_IN` = 0x3C from testbench stimulus
-Check all AXI handshakes (AW/W/B/AR/R)
+The testbench (`tb_axi_gpio_pwm.sv`) is self-checking with pass/fail reporting on every test. It exercises:
 
-## Observed waveform:
-AXI4-Lite Write + Read + GPIO Update + PWM Output
+- Simultaneous AW+W write
+- AW-before-W with a multi-cycle gap (tests AW latch)
+- W-before-AW with a multi-cycle gap (tests W latch)
+- `WSTRB` byte masking — write individual bytes, verify others are preserved
+- Write to unmapped address → `SLVERR` on B channel
+- Write to read-only `GPIO_IN` register → `SLVERR`
+- B-channel back-pressure — `BREADY` withheld for several cycles, `BVALID` must hold
+- Read from all four valid registers → `RESP_OKAY`
+- Read from unmapped address → `SLVERR` + `RDATA = 0xDEADBEEF`
+- GPIO input CDC sync — stimulus applied to `gpio_in`, sampled back through `GPIO_IN` register
+- PWM duty cycle — period=10, duty=5; output counted over one period, expect ~50% high
 
-## 🚀 Future Improvements
+All 10 sequences passed in Vivado behavioral simulation.
 
-Possible extensions include:
+---
 
-- Interrupt support for GPIO/pwm events
-- AXI burst support (AXI4 full)
-- Multiple PWM channels
+## Key Design Decisions
+
+**AW/W channel decoupling.** AXI4-Lite does not require the master to assert `AWVALID` and `WVALID` in the same cycle — they are independent channels. The slave latches whichever arrives first and waits for the other before issuing the write and response. This prevents write loss on any compliant AXI4-Lite master regardless of channel arrival order.
+
+**Registered `AWREADY`/`WREADY`.** Both ready signals are deasserted while a `BVALID` response is pending. This prevents a new write from being accepted before the previous response has been acknowledged, satisfying the AXI4 rule that a slave must not accept a new transaction while it cannot guarantee a response.
+
+**Two-flop GPIO input synchronizer.** External `gpio_in` is treated as an asynchronous input. A two-flop synchronizer is inserted before the register file to prevent metastability from propagating into the synchronous domain.
+
+---
+
+## What This Does Not Cover
+
+- AXI4 burst transactions (`ARLEN`, `AWLEN` > 0)
+- Interrupt generation on GPIO edge or PWM cycle events
 - Tri-state GPIO with direction control
-- APB-bridge or TileLink adaptation
-- Synthesis on FPGA board (PWM → real pin)
+- FPGA board implementation (simulation and synthesis only)
+- Formal verification or assertion-based coverage
 
-## 👨‍💻 Author
+---
+
+## Tools
+
+- **Simulation:** Vivado 2023.x behavioral simulation
+- **Synthesis:** Vivado synthesis — clean, no critical warnings
+- **Language:** SystemVerilog (IEEE 1800-2017)
+
+---
+
+## Author
 
 Srikanth Muthuvel Ganthimathi
-
-## 📜 License
-
-This project is for educational and research purposes.
-Modification and extension are encouraged.
